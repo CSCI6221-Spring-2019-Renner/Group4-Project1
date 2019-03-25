@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<head>
+    <title>ZChatroom!</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <link rel="stylesheet" href="//cdn.bootcss.com/bootstrap/3.3.5/css/bootstrap.min.css">
+    <script src="//cdn.bootcss.com/jquery/1.11.3/jquery.min.js"></script>
+   </head>
+<body>
+    <div class="container" >
+        <div>        
+            <div  style="width:75% ;float:left;">
+                <div>Thread:</div>
+                <div class="list-group" id="divShow">
+                    <!--<div class="list-group-item list-group-item-success">1111</div>
+                    <div class="list-group-item list-group-item-info">1111</div>
+                    <div class="list-group-item list-group-item-warning">1111</div>
+                    <div class="list-group-item list-group-item-danger">1111</div>-->
+                </div>
+            </div>
+            <div  style="width:25% ;float:right">
+                <div>Online users:</div>
+                <div class="list-group" id="divUsers">
+                    <!--<div class="btn btn-default">111</div>-->
+                </div>
+            </div>
+        </div>
+        <br style="clear:both;"/>
+
+        <div>
+            <div class='form-group'>
+                <label for='txtUserName'> Name</label>
+                <input class="form-control" id="txtUserName" value="Annymous" type="text" maxlength="20" style="width: 30%" />
+                Say:<textarea class="form-control" id="txtContent" autofocus rows="6" placeholder="Text here." maxlength="200" required style="width: 75%; "></textarea>
+            
+            </div>
+            <div>
+                <button class="btn btn-default" id="btnSend" style="margin-top:15px">Send</button>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+
+<script>
+
+    var tool = function () {
+
+        var paperLoopNum = 0;
+        var paperTempleArr = [
+            '<div class="list-group-item list-group-item-success">{0}</div>',
+            '<div class="list-group-item list-group-item-info">{0}</div>',
+            '<div class="list-group-item list-group-item-warning">{0}</div>',
+            '<div class="list-group-item list-group-item-danger">{0}</div>'
+        ];
+
+        return {
+
+            paperDiv: function (val) {
+
+                var hl = paperTempleArr[paperLoopNum];
+                paperLoopNum++;
+                if (paperLoopNum >= paperTempleArr.length) { paperLoopNum = 0; }
+
+                return this.formart(hl, [val])
+            },
+            formart: function (str, arrVal) {
+
+                for (var i = 0; i < arrVal.length; i++) {
+                    str = str.replace("{" + i + "}", arrVal[i]);
+                }
+                return str;
+            }
+        }
+    }
+
+    function showMsg(id, hl, isAppend) {
+
+        if (!isAppend) { $("#" + id).html(hl); } else {
+            $("#" + id).append(hl);
+        }
+    }
+
+    $(function () {
+
+        var tl = new tool();
+
+        var wsUrl = "ws://localhost:8888/webSocket";
+        ws = new WebSocket(wsUrl);
+
+        try {
+
+            ws.onopen = function () {
+
+            }
+
+            ws.onclose = function () {
+                if (ws) {
+                    ws.close();
+                    ws = null;
+                }
+                showMsg("divShow", tl.paperDiv("connection closed"), true);
+            }
+
+            ws.onmessage = function (result) {
+
+                //console.log(result.data);
+                var data = JSON.parse(result.data);
+                $(data.UserMsgs).each(function (i, item) {
+                    showMsg("divShow", "<div class=\"list-group-item \">" + "[" + item.UserName + "]: " + item.Msg + "</div>", true);
+                });
+
+                var userDataShow = [];
+                $(data.UserDatas).each(function (i, item) {
+
+                    userDataShow.push('<div class=\"list-group-item \">' + item.UserName + '</div>');
+
+                });
+                showMsg("divUsers", userDataShow.join(''), false);
+            }
+
+            ws.onerror = function () {
+                if (ws) {
+                    ws.close();
+                    ws = null;
+                }
+                showMsg("divShow", tl.paperDiv("connection error"), true);
+            }
+
+        } catch (e) {
+
+            alert(e.message);
+        }
+        $("#btnSend").on("click", function () {
+
+            var tContentObj = $("#txtContent");
+            var tContent = $.trim( tContentObj.val()).replace("/[\n]/g", "");
+            var tUserName = $.trim( $("#txtUserName").val()); tUserName = tUserName.length <= 0 ? "Annymous" : tUserName;
+            if (tContent.length <= 0 || $.trim(tContent).length <= 0) { alert("Empty message not allowed!"); return; }
+            if (ws == null) { alert("Connection failed!"); return; }
+
+            var request = tl.formart('{"UserName": "{0}", "DataType": "{1}", "Msg": "{2}" }',
+                                     [tUserName, "send", tContent]);
+            ws.send(request);
+            tContentObj.val("");
+            tContentObj.val($.trim(tContentObj.val()).replace("/[\n]/g", ""));
+        });
+        $("#txtContent").on("keydown", function (event) {
+
+            if (event.keyCode == 13) {
+
+                $("#btnSend").trigger("click");
+            }
+        });
+    })
+
+</script>
